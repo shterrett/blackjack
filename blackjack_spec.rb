@@ -1,6 +1,10 @@
 require 'minitest/autorun'
 require_relative 'blackjack'
 
+class Module
+  include Minitest::Spec::DSL
+end
+
 describe Deck do
   it 'creates a deck of cards' do
     deck = Deck.new(value_override: [1, 2, 3],
@@ -105,6 +109,15 @@ describe Card do
       card.wont_equal other
     end
   end
+
+  describe 'to_s' do
+    it 'converts the suite to the symbol' do
+      Card::SUITE_UTF_8.keys.each do |suite|
+        card = Card.new([3, suite])
+        card.to_s.must_equal "3#{Card::SUITE_UTF_8[suite]}"
+      end
+    end
+  end
 end
 
 describe Hand do
@@ -182,5 +195,101 @@ describe Hand do
 
       hand.score.must_equal 19
     end
+  end
+end
+
+module PlayerSharedMethodsSpec
+  it 'initializes with a hand' do
+    player_class.new.hand.must_be_instance_of Hand
+  end
+
+  it 'accepts a new card' do
+    player = player_class.new
+    card = Card.new [4, :h]
+
+    player.add_card(card)
+
+    player.cards.must_equal [card]
+  end
+end
+
+describe Player do
+  include PlayerSharedMethodsSpec
+
+  let(:player_class) { Player }
+
+  it 'prints all the cards in its hand' do
+    player = Player.new
+    cards = [Card.new([3, :c]), Card.new([5, :d])]
+    cards.each do |card|
+      player.add_card card
+    end
+
+    proc do
+      player.print_hand
+    end.must_output "Your Hand: 3\u{2663} 5\u{2666}\n"
+  end
+end
+
+describe Dealer do
+  include PlayerSharedMethodsSpec
+
+  let(:player_class) { Dealer }
+
+  it 'prints all but the first card in its hand' do
+    dealer = Dealer.new
+    cards = [Card.new([3, :c]), Card.new([5, :d])]
+    cards.each do |card|
+      dealer.add_card card
+    end
+
+    proc do
+      dealer.print_hand
+    end.must_output "Dealer: XX 5\u{2666}\n"
+  end
+end
+
+describe Game do
+  it 'stores the players in an array' do
+    players = [Player.new, Dealer.new]
+    deck = Deck.new
+    game = Game.new(deck, *players)
+    game.players.must_equal players
+    game.deck.must_equal deck
+  end
+
+  describe 'start!' do
+    it 'shuffles the deck' do
+      deck = MiniTest::Mock.new
+      player = Player.new
+      game = Game.new deck, player, test: true
+
+      deck.expect(:shuffle!, deck)
+      4.times { deck.expect(:next_card, Card.new([1, :h])) }
+      game.start!
+      deck.verify
+    end
+
+    it 'deals two cards to each player' do
+      deck = Deck.new
+      player = Player.new
+      game = Game.new deck, player, test: true
+
+      game.start!
+
+      player.cards.length.must_equal 2
+    end
+  end
+
+  it 'deals a card to a player' do
+    deck = Deck.new
+    player = Player.new
+    game = Game.new(deck, player)
+
+    player.cards.length.must_equal 0
+
+    game.deal_to(player)
+
+    player.cards.length.must_equal 1
   end
 end
