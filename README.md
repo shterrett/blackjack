@@ -32,3 +32,13 @@ the private control logic of the `Game` class directly. Not the cleanest ever,
 but gives me decent security. This
 [gist](https://gist.github.com/methodmissing/20349) inspired the
 `PrivatelyTestable` superclass.
+
+## To Play
+
+`$ git clone https://github.com/shterrett/blackjack.git`
+
+`$ cd blackjack`
+
+`$ chmod u+x play-blackjack.rb`
+
+`$ ./play-blackjack.rb`
