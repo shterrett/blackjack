@@ -229,6 +229,18 @@ describe Player do
       player.print_hand
     end.must_output "Your Hand: 3\u{2663} 5\u{2666}\n"
   end
+
+  it 'prints all cards in its hand for the final_hand' do
+    player = Player.new
+    cards = [Card.new([3, :c]), Card.new([5, :d])]
+    cards.each do |card|
+      player.add_card card
+    end
+
+    proc do
+      player.print_hand
+    end.must_output "Your Hand: 3\u{2663} 5\u{2666}\n"
+  end
 end
 
 describe Dealer do
@@ -246,6 +258,18 @@ describe Dealer do
     proc do
       dealer.print_hand
     end.must_output "Dealer: XX 5\u{2666}\n"
+  end
+
+  it 'prints all cards for final_hand' do
+    dealer = Dealer.new
+    cards = [Card.new([3, :c]), Card.new([5, :d])]
+    cards.each do |card|
+      dealer.add_card card
+    end
+
+    proc do
+      dealer.print_final_hand
+    end.must_output "Dealer: 3\u{2663} 5\u{2666}\n"
   end
 end
 
@@ -291,5 +315,159 @@ describe Game do
     game.deal_to(player)
 
     player.cards.length.must_equal 1
+  end
+
+  describe 'private methods for flow control' do
+    it 'increments the count of players staying on a turn' do
+      deck = Deck.new
+      player = Player.new
+      game = Game.new(deck, player)
+
+      game.instance_variable_get(:@stays).must_equal 0
+      game.stay
+      game.instance_variable_get(:@stays).must_equal 1
+    end
+
+    it 'resets the stays count' do
+      deck = Deck.new
+      player = Player.new
+      game = Game.new(deck, player)
+      Game.publicize_methods!
+
+      game.instance_variable_set(:@stays, 4)
+      game.reset_stays
+
+      game.instance_variable_get(:@stays).must_equal 0
+    end
+
+    it 'prints Bust! if a player goes over 21' do
+      deck = Deck.new
+      player = Player.new
+      game = Game.new(deck, player)
+      Game.publicize_methods!
+      cards = [Card.new([:K, :c]),
+               Card.new([:K, :h]),
+               Card.new([:K, :s])
+              ]
+
+      cards.each { |card| player.add_card(card) }
+
+      proc do
+        game.validate_score(player)
+      end.must_output "Bust!\n"
+    end
+
+    it 'checks if all players stay' do
+      deck = Deck.new
+      player = Player.new
+      game = Game.new(deck, player)
+      Game.publicize_methods!
+
+      game.all_stay?.must_equal false
+      game.stay
+      game.all_stay?.must_equal true
+    end
+
+    describe 'zero_or_one_valid?' do
+      it 'is false if more than 1 player has a score <= 21' do
+        deck = Deck.new
+        player_1 = Player.new
+        player_2 = Player.new
+        game = Game.new(deck, player_1, player_2)
+        Game.publicize_methods!
+
+        game.deal_all
+        game.zero_or_one_valid?.must_equal false
+      end
+
+      it 'is true if exactly one player has a score <= 21' do
+        deck = Deck.new
+        player_1 = Player.new
+        player_2 = Player.new
+        game = Game.new(deck, player_1, player_2)
+        Game.publicize_methods!
+        cards = [Card.new([10, :c]),
+                 Card.new([10, :d]),
+                 Card.new([10, :s]),
+                ]
+
+        cards.each { |card| player_1.add_card(card) }
+
+        game.deal_all
+        game.zero_or_one_valid?.must_equal true
+      end
+
+      it 'is true if no players have a score <= 21' do
+        deck = Deck.new
+        player_1 = Player.new
+        player_2 = Player.new
+        game = Game.new(deck, player_1, player_2)
+        Game.publicize_methods!
+        cards = [Card.new([10, :c]),
+                 Card.new([10, :d]),
+                 Card.new([10, :s]),
+                ]
+
+        cards.each { |card| player_1.add_card(card) }
+        cards.each { |card| player_2.add_card(card) }
+
+        game.zero_or_one_valid?.must_equal true
+      end
+    end
+
+    describe 'finding a winner' do
+      it 'picks the player with the highest hand under 21' do
+        deck = Deck.new
+        player_1 = Player.new
+        player_2 = Player.new
+        player_3 = Player.new
+        players = [player_1, player_2, player_3]
+        game = Game.new(deck, *players)
+        Game.publicize_methods!
+        cards = [Card.new([10, :c]),
+                 Card.new([10, :d]),
+                 Card.new([10, :s]),
+                ]
+
+        (1..3).each do |i|
+          cards.take(i).each { |card| players[i - 1].add_card(card) }
+        end
+
+        game.find_winner.must_equal player_2
+      end
+    end
+
+    describe 'ending game' do
+      it 'calls end_game if all players stay' do
+        deck = Deck.new
+        player_1 = Player.new
+        player_2 = Player.new
+        game = Game.new(deck, player_1, player_2)
+        Game.publicize_methods!
+
+        2.times { game.stay }
+
+        game.check_end_conditions
+        game.instance_variable_get(:@game_on).must_equal false
+      end
+
+      it 'calls end_game if zero or one players are still valid' do
+        deck = Deck.new
+        player_1 = Player.new
+        player_2 = Player.new
+        game = Game.new(deck, player_1, player_2)
+        Game.publicize_methods!
+
+        cards = [Card.new([10, :c]),
+                 Card.new([10, :d]),
+                 Card.new([10, :s]),
+                ]
+
+        cards.each { |card| player_1.add_card(card) }
+
+        game.check_end_conditions
+        game.instance_variable_get(:@game_on).must_equal false
+      end
+    end
   end
 end

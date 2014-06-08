@@ -44,7 +44,11 @@ class Card
                 K: 10,
                 A: 1
               }
-  SUITE_UTF_8 = { s: "\u{2660}", h: "\u{2665}", d: "\u{2666}", c: "\u{2663}" }
+  SUITE_UTF_8 = { s: "\u{2660}",
+                  h: "\u{2665}",
+                  d: "\u{2666}",
+                  c: "\u{2663}"
+                }
 
   attr_reader :suite
 
@@ -147,10 +151,14 @@ class Player
         )
   end
 
+  def print_final_hand
+    print_hand
+  end
+
   def take_turn(game)
     puts 'Next Turn'
     print_hand
-    puts 'Hit (h) or Stay (s)?: '
+    print 'Hit (h) or Stay (s)?: '
     choice = gets.chomp
     if choice.downcase == 'h' || choice.downcase == 'hit'
       game.deal_to(self)
@@ -174,10 +182,16 @@ class Dealer
         )
   end
 
+  def print_final_hand
+    puts("Dealer: " +
+         cards.map { |card| card.to_s }.join(" ")
+        )
+  end
+
   def take_turn(game)
     puts 'Dealers Turn'
     print_hand
-    if score > 15
+    if score <= 12
       puts 'Hit me'
       game.deal_to(self)
       puts cards.last.to_s
@@ -188,7 +202,14 @@ class Dealer
   end
 end
 
-class Game
+class PrivatelyTestable
+  def self.publicize_methods!
+    hidden_methods = self.private_instance_methods + self.protected_instance_methods
+    self.class_eval { public *hidden_methods }
+  end
+end
+
+class Game < PrivatelyTestable
   attr_reader :deck, :players
 
   def initialize(deck, *players, test:  false)
@@ -202,6 +223,7 @@ class Game
   def start!
     deck.shuffle!
     2.times { deal_all }
+    players.each { |player| player.print_hand }
     take_turns
   end
 
@@ -253,23 +275,24 @@ class Game
   end
 
   def zero_or_one_valid?
-    players.reject { |player| player.score > 21 } <= 1
+    players.reject { |player| player.score > 21 }.length <= 1
+  end
+
+  def find_winner
+    players.reject { |player| player.score > 21 }
+           .max { |a, b| a.score <=> b.score }
   end
 
   def end_game
     @game_on = false
-    winner = players.reject { |player| player.score > 21 }
-               .max { |a, b| a.score <=> b.score }
+    winner = find_winner
     players.each do |player|
       if player == winner
         print 'Winner! '
-        player.print_hand
       elsif player.score > 21
         print 'Over! '
-        player.print_hand
-      else
-        player.print_hand
       end
+      player.print_final_hand
     end
   end
 end
